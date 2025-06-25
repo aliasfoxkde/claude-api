@@ -173,7 +173,7 @@ export async function handleOpenAIChatCompletions(c: Context<{ Bindings: Env }>)
     }
 
     // Handle non-streaming response
-    const response = transformPuterToOpenAI(puterResponse as any, validatedModel, requestId);
+    const response = transformPuterToOpenAI(puterResponse as any, validatedModel, requestId, prompt);
     return c.json(response);
 
   } catch (error) {
@@ -265,7 +265,7 @@ export async function handleClaudeMessages(c: Context<{ Bindings: Env }>) {
     }
 
     // Handle non-streaming response
-    const response = transformPuterToClaude(puterResponse as any, validatedModel, requestId);
+    const response = transformPuterToClaude(puterResponse as any, validatedModel, requestId, prompt);
     return c.json(response);
 
   } catch (error) {

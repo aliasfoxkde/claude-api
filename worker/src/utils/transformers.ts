@@ -24,13 +24,29 @@ export function transformOpenAIToPuter(request: OpenAIChatCompletionRequest): {
 
   // Map OpenAI model names to Puter model names
   const modelMap: Record<string, string> = {
+    // OpenAI models
     'gpt-4': 'gpt-4o',
     'gpt-4-turbo': 'gpt-4o',
+    'gpt-4-turbo-preview': 'gpt-4o',
     'gpt-3.5-turbo': 'gpt-4o-mini',
+    'gpt-3.5-turbo-16k': 'gpt-4o-mini',
+
+    // Claude models (normalize to Puter naming)
     'claude-3-5-sonnet': 'claude-3-5-sonnet',
+    'claude-3-5-sonnet-20241022': 'claude-3-5-sonnet',
+    'claude-3-5-sonnet-20240620': 'claude-3-5-sonnet',
     'claude-3-sonnet': 'claude-3-5-sonnet',
+    'claude-3-sonnet-20240229': 'claude-sonnet-4',
     'claude-3-opus': 'claude-opus-4',
-    'claude-3-haiku': 'claude-sonnet-4'
+    'claude-3-opus-20240229': 'claude-opus-4',
+    'claude-3-haiku': 'claude-sonnet-4',
+    'claude-3-haiku-20240307': 'claude-sonnet-4',
+
+    // Anthropic API naming
+    'anthropic.claude-3-5-sonnet-20241022-v2:0': 'claude-3-5-sonnet',
+    'anthropic.claude-3-sonnet-20240229-v1:0': 'claude-sonnet-4',
+    'anthropic.claude-3-opus-20240229-v1:0': 'claude-opus-4',
+    'anthropic.claude-3-haiku-20240307-v1:0': 'claude-sonnet-4'
   };
 
   const puterModel = modelMap[request.model] || request.model;
@@ -64,7 +80,8 @@ export function transformOpenAIToPuter(request: OpenAIChatCompletionRequest): {
 export function transformPuterToOpenAI(
   puterResponse: PuterChatResponse,
   model: string,
-  requestId?: string
+  requestId?: string,
+  originalPrompt?: string | Array<{ role: string; content: string }>
 ): OpenAIChatCompletionResponse {
   const content = puterResponse.message.content
     .filter(c => c.type === 'text')
@@ -93,10 +110,16 @@ export function transformPuterToOpenAI(
       finish_reason: puterResponse.message.tool_calls ? 'tool_calls' : 'stop'
     }],
     usage: {
-      prompt_tokens: 0, // Puter doesn't provide token counts
-      completion_tokens: 0,
-      total_tokens: 0
+      prompt_tokens: originalPrompt ? estimateTokenCount(typeof originalPrompt === 'string' ? originalPrompt : JSON.stringify(originalPrompt)) : 0,
+      completion_tokens: estimateTokenCount(content),
+      total_tokens: 0 // Will be calculated below
     }
+  };
+
+  // Calculate total tokens
+  response.usage.total_tokens = response.usage.prompt_tokens + response.usage.completion_tokens;
+
+  return response;
   };
 }
 
@@ -127,13 +150,24 @@ export function transformClaudeToPuter(request: ClaudeMessagesRequest): {
     });
   });
 
-  // Map Claude model names to Puter model names
+  // Map Claude model names to Puter model names (same as OpenAI mapping)
   const modelMap: Record<string, string> = {
+    // Claude models (normalize to Puter naming)
+    'claude-3-5-sonnet': 'claude-3-5-sonnet',
     'claude-3-5-sonnet-20241022': 'claude-3-5-sonnet',
     'claude-3-5-sonnet-20240620': 'claude-3-5-sonnet',
-    'claude-3-opus-20240229': 'claude-opus-4',
+    'claude-3-sonnet': 'claude-3-5-sonnet',
     'claude-3-sonnet-20240229': 'claude-sonnet-4',
-    'claude-3-haiku-20240307': 'claude-sonnet-4'
+    'claude-3-opus': 'claude-opus-4',
+    'claude-3-opus-20240229': 'claude-opus-4',
+    'claude-3-haiku': 'claude-sonnet-4',
+    'claude-3-haiku-20240307': 'claude-sonnet-4',
+
+    // Anthropic API naming
+    'anthropic.claude-3-5-sonnet-20241022-v2:0': 'claude-3-5-sonnet',
+    'anthropic.claude-3-sonnet-20240229-v1:0': 'claude-sonnet-4',
+    'anthropic.claude-3-opus-20240229-v1:0': 'claude-opus-4',
+    'anthropic.claude-3-haiku-20240307-v1:0': 'claude-sonnet-4'
   };
 
   const puterModel = modelMap[request.model] || request.model;
@@ -167,7 +201,8 @@ export function transformClaudeToPuter(request: ClaudeMessagesRequest): {
 export function transformPuterToClaude(
   puterResponse: PuterChatResponse,
   model: string,
-  requestId?: string
+  requestId?: string,
+  originalPrompt?: string | Array<{ role: string; content: string }>
 ): ClaudeMessagesResponse {
   const textContent = puterResponse.message.content
     .filter(c => c.type === 'text')
@@ -198,8 +233,8 @@ export function transformPuterToClaude(
     model,
     stop_reason: puterResponse.message.tool_calls ? 'tool_use' : 'end_turn',
     usage: {
-      input_tokens: 0, // Puter doesn't provide token counts
-      output_tokens: 0
+      input_tokens: originalPrompt ? estimateTokenCount(typeof originalPrompt === 'string' ? originalPrompt : JSON.stringify(originalPrompt)) : 0,
+      output_tokens: estimateTokenCount(textContent)
     }
   };
 }
@@ -310,4 +345,28 @@ export function validateModel(model: string): string {
 
   // Default to Claude Sonnet 4 for unknown models
   return 'claude-sonnet-4';
+}
+
+/**
+ * Estimate token count for text
+ * This is a rough approximation - actual token counts may vary by model
+ */
+export function estimateTokenCount(text: string): number {
+  if (!text) return 0;
+
+  // Rough approximation: 1 token ≈ 4 characters for English text
+  // This varies by model and language, but provides a reasonable estimate
+  const charCount = text.length;
+  const wordCount = text.split(/\s+/).length;
+
+  // Use a more sophisticated estimation:
+  // - Average English word is ~4.7 characters
+  // - Most tokenizers split on word boundaries and subwords
+  // - Punctuation and special characters affect tokenization
+
+  // Conservative estimate: 0.75 tokens per word
+  const estimatedTokens = Math.ceil(wordCount * 0.75);
+
+  // Minimum of 1 token for non-empty text
+  return Math.max(1, estimatedTokens);
 }

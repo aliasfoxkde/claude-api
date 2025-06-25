@@ -12,15 +12,17 @@ export async function handleHealth(c: Context<{ Bindings: Env }>) {
     // Test Puter client connectivity
     let puterStatus = 'unknown';
     let puterLatency = 0;
+    let puterError: string | undefined;
 
     try {
-      const puterStartTime = Date.now();
-      const models = await puterClient.getModels();
-      puterLatency = Date.now() - puterStartTime;
-      // If we get models back, Puter is working
-      puterStatus = models && models.length > 0 ? 'healthy' : 'degraded';
+      const connectivityTest = await puterClient.testConnectivity();
+      puterStatus = connectivityTest.status;
+      puterLatency = connectivityTest.latency;
+      puterError = connectivityTest.error;
     } catch (error) {
       puterStatus = 'unhealthy';
+      puterLatency = 0;
+      puterError = error instanceof Error ? error.message : 'Unknown error';
       console.error('Puter health check failed:', error);
     }
 
@@ -41,7 +43,8 @@ export async function handleHealth(c: Context<{ Bindings: Env }>) {
     }
 
     const totalLatency = Date.now() - startTime;
-    const overallStatus = puterStatus === 'healthy' && kvStatus === 'healthy' ? 'healthy' : 'degraded';
+    const overallStatus = puterStatus === 'healthy' && kvStatus === 'healthy' ? 'healthy' :
+                         puterStatus === 'unhealthy' || kvStatus === 'unhealthy' ? 'unhealthy' : 'degraded';
 
     const healthData = {
       status: overallStatus,
@@ -51,7 +54,8 @@ export async function handleHealth(c: Context<{ Bindings: Env }>) {
       services: {
         puter: {
           status: puterStatus,
-          latency: puterLatency
+          latency: puterLatency,
+          error: puterError
         },
         kv: {
           status: kvStatus,
@@ -90,8 +94,8 @@ export async function handleReadiness(c: Context<{ Bindings: Env }>) {
   try {
     // Check if all required services are available
     const checks = await Promise.allSettled([
-      // Test Puter client
-      puterClient.getModels(),
+      // Test Puter client connectivity
+      puterClient.testConnectivity(),
       
       // Test KV storage
       c.env.API_KEYS.put('readiness-check', 'test', { expirationTtl: 60 })
@@ -99,7 +103,10 @@ export async function handleReadiness(c: Context<{ Bindings: Env }>) {
         .then(() => c.env.API_KEYS.delete('readiness-check'))
     ]);
 
-    const allReady = checks.every(check => check.status === 'fulfilled');
+    const puterReady = checks[0].status === 'fulfilled' &&
+      (checks[0].value as any)?.status === 'healthy';
+    const kvReady = checks[1].status === 'fulfilled';
+    const allReady = puterReady && kvReady;
 
     if (allReady) {
       return c.json({
@@ -115,8 +122,8 @@ export async function handleReadiness(c: Context<{ Bindings: Env }>) {
         status: 'not_ready',
         timestamp: new Date().toISOString(),
         checks: {
-          puter: checks[0].status === 'fulfilled' ? 'ready' : 'not_ready',
-          kv: checks[1].status === 'fulfilled' ? 'ready' : 'not_ready'
+          puter: puterReady ? 'ready' : 'not_ready',
+          kv: kvReady ? 'ready' : 'not_ready'
         }
       }, 503);
     }
