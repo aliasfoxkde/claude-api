@@ -2,6 +2,7 @@
 export interface Env {
   API_KEYS: KVNamespace;
   RATE_LIMITS: KVNamespace;
+  PUTER_AUTH: KVNamespace;
   ENVIRONMENT: string;
   API_VERSION: string;
   MAX_REQUESTS_PER_MINUTE: string;
@@ -221,6 +222,24 @@ export interface APIError {
     param?: string;
     code?: string;
   };
+}
+
+// Puter Authentication Types
+export interface PuterAuthCredentials {
+  appId: string;
+  authToken: string;
+  createdAt: string;
+  lastUsed?: string;
+  isValid: boolean;
+  expiresAt?: string;
+}
+
+export interface PuterAuthStatus {
+  isAuthenticated: boolean;
+  appId?: string;
+  lastUsed?: string;
+  expiresAt?: string;
+  error?: string;
 }
 
 // Request context

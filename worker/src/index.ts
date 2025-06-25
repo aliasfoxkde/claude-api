@@ -28,9 +28,23 @@ import {
   handleLiveness,
   handleMetrics
 } from './handlers/health';
+import {
+  handlePuterAuthSetup,
+  handlePuterAuthStatus,
+  handlePuterAuthValidate,
+  handlePuterAuthClear,
+  handlePuterAuthRefresh
+} from './handlers/puter-auth';
+import { initializePuterClient } from './utils/puter-client';
 
 // Create Hono app
 const app = new Hono<{ Bindings: Env }>();
+
+// Initialize Puter client with environment on first request
+app.use('*', async (c, next) => {
+  initializePuterClient(c.env);
+  await next();
+});
 
 // Global middleware
 app.use('*', errorHandlingMiddleware);
@@ -70,6 +84,13 @@ app.get('/', (c) => {
         key_usage: ['GET /v1/keys/:keyId/usage', 'GET /keys/:keyId/usage'],
         current_key: ['GET /v1/keys/current', 'GET /keys/current']
       },
+      puter_auth: {
+        setup: ['POST /v1/puter/auth/setup', 'POST /puter/auth/setup'],
+        status: ['GET /v1/puter/auth/status', 'GET /puter/auth/status'],
+        validate: ['POST /v1/puter/auth/validate', 'POST /puter/auth/validate'],
+        clear: ['DELETE /v1/puter/auth', 'DELETE /puter/auth'],
+        refresh: ['POST /v1/puter/auth/refresh', 'POST /puter/auth/refresh']
+      },
       health: {
         health: ['GET /health', 'GET /v1/health'],
         readiness: ['GET /health/ready', 'GET /v1/health/ready'],
@@ -98,6 +119,8 @@ app.use('/messages', authMiddleware);
 app.use('/messages', rateLimitMiddleware);
 app.use('/keys', authMiddleware);
 app.use('/keys/*', authMiddleware);
+app.use('/v1/puter/*', authMiddleware);
+app.use('/puter/*', authMiddleware);
 
 // OpenAI-compatible endpoints - both versioned and unversioned
 app.post('/v1/chat/completions', handleOpenAIChatCompletions);
@@ -122,6 +145,18 @@ app.get('/v1/keys/:keyId/usage', handleAPIKeyUsage);
 app.get('/keys/:keyId/usage', handleAPIKeyUsage);
 app.get('/v1/keys/current', handleCurrentAPIKey);
 app.get('/keys/current', handleCurrentAPIKey);
+
+// Puter authentication endpoints - both versioned and unversioned
+app.post('/v1/puter/auth/setup', handlePuterAuthSetup);
+app.post('/puter/auth/setup', handlePuterAuthSetup);
+app.get('/v1/puter/auth/status', handlePuterAuthStatus);
+app.get('/puter/auth/status', handlePuterAuthStatus);
+app.post('/v1/puter/auth/validate', handlePuterAuthValidate);
+app.post('/puter/auth/validate', handlePuterAuthValidate);
+app.delete('/v1/puter/auth', handlePuterAuthClear);
+app.delete('/puter/auth', handlePuterAuthClear);
+app.post('/v1/puter/auth/refresh', handlePuterAuthRefresh);
+app.post('/puter/auth/refresh', handlePuterAuthRefresh);
 
 // Legacy OpenAI endpoints (redirects)
 app.post('/v1/completions', (c) => {

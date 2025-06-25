@@ -1,4 +1,5 @@
-import { PuterChatOptions, PuterChatResponse } from '../types';
+import { PuterChatOptions, PuterChatResponse, Env } from '../types';
+import { PuterAuthManager } from './puter-auth';
 
 /**
  * Puter.js client implementation for server-side usage
@@ -7,10 +8,18 @@ import { PuterChatOptions, PuterChatResponse } from '../types';
 export class PuterClient {
   private static readonly PUTER_JS_URL = 'https://js.puter.com/v2/';
   private static readonly PUTER_PROXY_URL = 'https://puter-proxy.cyopsys.workers.dev';
+  private authManager?: PuterAuthManager;
+
+  /**
+   * Initialize the client with environment for authentication
+   */
+  initialize(env: Env): void {
+    this.authManager = new PuterAuthManager(env);
+  }
 
   /**
    * Execute Puter.js chat function server-side
-   * Uses direct API calls to Puter's backend services
+   * Uses direct API calls to Puter's backend services with authentication
    */
   async chat(
     prompt: string | Array<{ role: string; content: string }>,
@@ -24,15 +33,20 @@ export class PuterClient {
       tools
     } = options;
 
-    console.log('🔍 [PUTER] Starting direct API integration');
+    console.log('🔍 [PUTER] Starting authenticated API integration');
     console.log('🔍 [PUTER] Model:', model);
     console.log('🔍 [PUTER] Stream:', stream);
 
+    // Check if authentication is available
+    if (!this.authManager) {
+      throw new Error('PuterClient not initialized with environment. Call initialize(env) first.');
+    }
+
     try {
-      // Use direct API calls to Puter's backend
+      // Use authenticated API calls to Puter's backend
       return await this.callPuterDriversAPI(prompt, options);
     } catch (error) {
-      console.error('❌ [PUTER] Direct API call failed:', error);
+      console.error('❌ [PUTER] Authenticated API call failed:', error);
       throw new Error(`Puter API call failed: ${error}`);
     }
   }
@@ -117,26 +131,28 @@ export class PuterClient {
   }
 
   /**
-   * Make the actual request to Puter's drivers API
+   * Make the actual request to Puter's drivers API with authentication
    */
   private async makePuterDriversRequest(payload: any, isStreaming: boolean = false): Promise<any> {
-    console.log('🔍 [PUTER] Making request to Puter drivers API');
+    console.log('🔍 [PUTER] Making authenticated request to Puter drivers API');
     console.log('🔍 [PUTER] Payload:', JSON.stringify(payload, null, 2));
+
+    // Get authentication headers
+    const authHeaders = await this.authManager!.getAuthHeaders();
+    if (!authHeaders) {
+      throw new Error('No valid Puter authentication credentials available. Please set up authentication first.');
+    }
 
     // Puter's API endpoint for drivers
     const apiUrl = 'https://api.puter.com/drivers/call';
 
     try {
-      console.log('🔍 [PUTER] Sending request to:', apiUrl);
+      console.log('🔍 [PUTER] Sending authenticated request to:', apiUrl);
+      console.log('🔍 [PUTER] Using App ID:', authHeaders['X-Puter-App-ID']);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'PuterProxy/1.0',
-          // Note: Puter.js typically doesn't require authentication for basic AI calls
-          // but we might need to handle this differently
-        },
+        headers: authHeaders,
         body: JSON.stringify(payload)
       });
 
@@ -444,14 +460,32 @@ Please try again later or check the Puter.com status.`;
   }
 
   /**
-   * Test connectivity to Puter services
+   * Test connectivity to Puter services with authentication
    */
   async testConnectivity(): Promise<{ status: 'healthy' | 'degraded' | 'unhealthy'; latency: number; error?: string }> {
     console.log('🔍 [CONNECTIVITY] Starting Puter connectivity test');
     const startTime = Date.now();
 
+    if (!this.authManager) {
+      return {
+        status: 'unhealthy',
+        latency: Date.now() - startTime,
+        error: 'PuterClient not initialized with environment'
+      };
+    }
+
     try {
-      console.log('🔍 [CONNECTIVITY] Testing Puter API connectivity');
+      console.log('🔍 [CONNECTIVITY] Testing authenticated Puter API connectivity');
+
+      // Get authentication headers
+      const authHeaders = await this.authManager.getAuthHeaders();
+      if (!authHeaders) {
+        return {
+          status: 'unhealthy',
+          latency: Date.now() - startTime,
+          error: 'No valid authentication credentials available'
+        };
+      }
 
       // Test the actual Puter drivers API with a simple request
       const testPayload = {
@@ -464,13 +498,10 @@ Please try again later or check the Puter.com status.`;
         }
       };
 
-      console.log('🔍 [CONNECTIVITY] Making test request to Puter API');
+      console.log('🔍 [CONNECTIVITY] Making authenticated test request to Puter API');
       const response = await fetch('https://api.puter.com/drivers/call', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'PuterProxy/1.0'
-        },
+        headers: authHeaders,
         body: JSON.stringify(testPayload),
         signal: AbortSignal.timeout(10000)
       });
@@ -595,3 +626,11 @@ This proxy is designed to bridge server-side applications with Puter.com's brows
 
 // Export a singleton instance
 export const puterClient = new PuterClient();
+
+/**
+ * Initialize the Puter client with environment
+ * This should be called once during worker initialization
+ */
+export function initializePuterClient(env: Env): void {
+  puterClient.initialize(env);
+}

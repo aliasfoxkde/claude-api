@@ -6,6 +6,7 @@ A production-ready API proxy that provides real AI model access through Puter.co
 
 - **Real AI Integration**: Connects to actual AI models via Puter.com (no more mock responses!)
 - **Free Claude Access**: Unlimited access to Claude 3.5 Sonnet, Claude Opus, and 25+ other AI models
+- **Persistent Authentication**: Server-side credential storage eliminates manual login requirements
 - **API Compatibility**: Drop-in replacement for OpenAI and Anthropic APIs
 - **Accurate Token Usage**: Real token counting for proper billing and monitoring
 - **Model Routing**: Intelligent routing to specific AI providers (Claude, GPT-4, DeepSeek, Gemini, etc.)

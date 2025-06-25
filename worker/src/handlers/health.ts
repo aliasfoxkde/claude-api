@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { Env } from '../types';
 import { puterClient } from '../utils/puter-client';
+import { PuterAuthManager } from '../utils/puter-auth';
 
 /**
  * Handle health check endpoint
@@ -26,10 +27,25 @@ export async function handleHealth(c: Context<{ Bindings: Env }>) {
       console.error('Puter health check failed:', error);
     }
 
+    // Test Puter authentication status
+    let authStatus = 'unknown';
+    let authError: string | undefined;
+
+    try {
+      const authManager = new PuterAuthManager(c.env);
+      const puterAuthStatus = await authManager.getAuthStatus();
+      authStatus = puterAuthStatus.isAuthenticated ? 'authenticated' : 'not_authenticated';
+      authError = puterAuthStatus.error;
+    } catch (error) {
+      authStatus = 'error';
+      authError = error instanceof Error ? error.message : 'Unknown auth error';
+      console.error('Puter auth status check failed:', error);
+    }
+
     // Test KV storage
     let kvStatus = 'unknown';
     let kvLatency = 0;
-    
+
     try {
       const kvStartTime = Date.now();
       await c.env.API_KEYS.put('health-check', 'test', { expirationTtl: 60 });
@@ -43,7 +59,7 @@ export async function handleHealth(c: Context<{ Bindings: Env }>) {
     }
 
     const totalLatency = Date.now() - startTime;
-    const overallStatus = puterStatus === 'healthy' && kvStatus === 'healthy' ? 'healthy' :
+    const overallStatus = puterStatus === 'healthy' && kvStatus === 'healthy' && authStatus === 'authenticated' ? 'healthy' :
                          puterStatus === 'unhealthy' || kvStatus === 'unhealthy' ? 'unhealthy' : 'degraded';
 
     const healthData = {
@@ -56,6 +72,10 @@ export async function handleHealth(c: Context<{ Bindings: Env }>) {
           status: puterStatus,
           latency: puterLatency,
           error: puterError
+        },
+        puter_auth: {
+          status: authStatus,
+          error: authError
         },
         kv: {
           status: kvStatus,

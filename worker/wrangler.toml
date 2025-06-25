@@ -20,6 +20,11 @@ binding = "RATE_LIMITS"
 id = "ce95cdc3e48e4f9a9bcfc6e46cb9bb9b"
 preview_id = "ce95cdc3e48e4f9a9bcfc6e46cb9bb9b"
 
+[[kv_namespaces]]
+binding = "PUTER_AUTH"
+id = "900d93d39d6048ef8763b4e4f897ffa1"
+preview_id = "900d93d39d6048ef8763b4e4f897ffa1"
+
 # Environment variables
 [vars]
 ENVIRONMENT = "development"
