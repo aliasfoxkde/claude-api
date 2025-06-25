@@ -78,22 +78,19 @@ export class PuterAuthManager {
       
       // Make a test API call to validate the credentials
       const testPayload = {
-        interface: 'puter-chat-completion',
-        method: 'ai-chat',
-        args: {
-          messages: [{ role: 'user', content: 'test' }],
-          model: 'claude-3-5-sonnet',
-          max_tokens: 1
-        }
+        messages: [{ role: 'user', content: 'test' }],
+        model: 'claude-3-5-sonnet',
+        max_tokens: 1
       };
 
-      const response = await fetch('https://api.puter.com/drivers/call', {
+      const response = await fetch('https://api.puter.com/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${credentials.authToken}`,
-          'X-Puter-App-ID': credentials.appId,
-          'User-Agent': 'PuterProxy/1.0'
+          'Cookie': `puter_auth_token=${credentials.authToken}`,
+          'User-Agent': 'PuterProxy/1.0',
+          'Referer': 'https://puter.com/',
+          'Origin': 'https://puter.com'
         },
         body: JSON.stringify(testPayload),
         signal: AbortSignal.timeout(10000)
@@ -226,16 +223,17 @@ export class PuterAuthManager {
    */
   async getAuthHeaders(): Promise<Record<string, string> | null> {
     const credentials = await this.getCredentials();
-    
+
     if (!credentials || !credentials.isValid) {
       return null;
     }
 
     return {
-      'Authorization': `Bearer ${credentials.authToken}`,
-      'X-Puter-App-ID': credentials.appId,
       'Content-Type': 'application/json',
-      'User-Agent': 'PuterProxy/1.0'
+      'Cookie': `puter_auth_token=${credentials.authToken}`,
+      'User-Agent': 'PuterProxy/1.0',
+      'Referer': 'https://puter.com/',
+      'Origin': 'https://puter.com'
     };
   }
 }

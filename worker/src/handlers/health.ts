@@ -86,7 +86,7 @@ export async function handleHealth(c: Context<{ Bindings: Env }>) {
         total: totalLatency,
         unit: 'ms'
       },
-      uptime: process.uptime ? Math.floor(process.uptime()) : null
+      uptime: null // process.uptime() not available in Cloudflare Workers
     };
 
     // Return appropriate status code

@@ -178,6 +178,43 @@ curl -X POST https://your-worker.your-subdomain.workers.dev/v1/keys \
 ### Via Documentation Interface
 Visit your deployed documentation site and use the API Keys page for a user-friendly interface.
 
+## 🔐 Puter Authentication Setup
+
+The proxy requires Puter.com authentication credentials to access AI models. Set this up once after deployment:
+
+### 1. Get Your Puter Credentials
+
+Visit [puter.com](https://puter.com) and sign in. Open browser developer tools and find:
+- **Auth Token**: From localStorage `auth_token` or cookie `puter_auth_token`
+- **User UUID**: From localStorage `user.uuid`
+
+### 2. Configure Authentication
+
+```bash
+curl -X POST https://your-worker.your-subdomain.workers.dev/v1/puter/auth/setup \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-admin-api-key" \
+  -d '{
+    "appId": "your-user-uuid",
+    "authToken": "your-puter-auth-token"
+  }'
+```
+
+### 3. Verify Authentication
+
+```bash
+curl -X POST https://your-worker.your-subdomain.workers.dev/v1/puter/auth/validate \
+  -H "Authorization: Bearer your-admin-api-key"
+```
+
+### 4. Check Status
+
+```bash
+curl https://your-worker.your-subdomain.workers.dev/health
+```
+
+The health endpoint will show `puter_auth: authenticated` when properly configured.
+
 ## 📊 Usage Examples
 
 ### OpenAI SDK

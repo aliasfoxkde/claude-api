@@ -106,18 +106,14 @@ export class PuterClient {
       messages = prompt;
     }
 
-    // Prepare the payload that matches Puter's drivers API format
+    // Prepare the payload for Puter's AI chat API
     const payload = {
-      interface: 'puter-chat-completion',
-      method: 'ai-chat',
-      args: {
-        messages: messages,
-        model: options.model || 'claude-3-5-sonnet',
-        stream: options.stream || false,
-        max_tokens: options.max_tokens,
-        temperature: options.temperature,
-        tools: options.tools
-      }
+      messages: messages,
+      model: options.model || 'claude-3-5-sonnet',
+      stream: options.stream || false,
+      max_tokens: options.max_tokens,
+      temperature: options.temperature,
+      tools: options.tools
     };
 
     console.log('🔍 [PUTER] Prepared payload structure:', {
@@ -143,8 +139,8 @@ export class PuterClient {
       throw new Error('No valid Puter authentication credentials available. Please set up authentication first.');
     }
 
-    // Puter's API endpoint for drivers
-    const apiUrl = 'https://api.puter.com/drivers/call';
+    // Try Puter's AI API endpoint directly
+    const apiUrl = 'https://api.puter.com/ai/chat';
 
     try {
       console.log('🔍 [PUTER] Sending authenticated request to:', apiUrl);
