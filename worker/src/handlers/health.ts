@@ -12,12 +12,13 @@ export async function handleHealth(c: Context<{ Bindings: Env }>) {
     // Test Puter client connectivity
     let puterStatus = 'unknown';
     let puterLatency = 0;
-    
+
     try {
       const puterStartTime = Date.now();
-      await puterClient.getModels();
+      const models = await puterClient.getModels();
       puterLatency = Date.now() - puterStartTime;
-      puterStatus = 'healthy';
+      // If we get models back, Puter is working
+      puterStatus = models && models.length > 0 ? 'healthy' : 'degraded';
     } catch (error) {
       puterStatus = 'unhealthy';
       console.error('Puter health check failed:', error);

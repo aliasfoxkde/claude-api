@@ -1,0 +1,47 @@
+name = "claude-api"
+main = "worker/src/index.ts"
+compatibility_date = "2024-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+[env.production]
+name = "claude-api"
+
+[env.staging]
+name = "claude-api-staging"
+
+# KV Namespaces for API key storage and rate limiting
+# REPLACE THE IDs BELOW WITH YOUR ACTUAL NAMESPACE IDs FROM CLOUDFLARE DASHBOARD
+[[kv_namespaces]]
+binding = "API_KEYS"
+id = "REPLACE_WITH_YOUR_API_KEYS_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_YOUR_API_KEYS_NAMESPACE_ID"
+
+[[kv_namespaces]]
+binding = "RATE_LIMITS"
+id = "REPLACE_WITH_YOUR_RATE_LIMITS_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_YOUR_RATE_LIMITS_NAMESPACE_ID"
+
+# Environment variables
+[vars]
+ENVIRONMENT = "development"
+API_VERSION = "v1"
+MAX_REQUESTS_PER_MINUTE = "60"
+MAX_REQUESTS_PER_HOUR = "1000"
+MAX_REQUESTS_PER_DAY = "10000"
+CORS_ORIGINS = "*"
+
+# Production environment variables
+[env.production.vars]
+ENVIRONMENT = "production"
+MAX_REQUESTS_PER_MINUTE = "100"
+MAX_REQUESTS_PER_HOUR = "5000"
+MAX_REQUESTS_PER_DAY = "50000"
+CORS_ORIGINS = "https://your-docs-site.pages.dev,https://your-custom-domain.com"
+
+# Staging environment variables
+[env.staging.vars]
+ENVIRONMENT = "staging"
+MAX_REQUESTS_PER_MINUTE = "30"
+MAX_REQUESTS_PER_HOUR = "500"
+MAX_REQUESTS_PER_DAY = "5000"
+CORS_ORIGINS = "https://your-docs-site-staging.pages.dev,http://localhost:3000"

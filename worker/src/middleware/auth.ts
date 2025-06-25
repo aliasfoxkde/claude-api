@@ -77,10 +77,32 @@ export async function validateAPIKey(env: Env, key: string): Promise<APIKey | nu
 export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) {
   // Skip auth for certain endpoints
   const path = new URL(c.req.url).pathname;
-  const publicPaths = ['/health', '/v1/models'];
-  
-  if (publicPaths.includes(path)) {
+  const publicPaths = [
+    '/health', '/v1/health',
+    '/health/ready', '/v1/health/ready',
+    '/health/live', '/v1/health/live',
+    '/metrics', '/v1/metrics',
+    '/models', '/v1/models'
+  ];
+
+  if (publicPaths.some(publicPath => path === publicPath || path.startsWith(publicPath + '/'))) {
     return next();
+  }
+
+  // Special case: Allow first API key creation without authentication
+  if ((path === '/v1/keys' || path === '/keys') && c.req.method === 'POST') {
+    try {
+      // Check if any API keys exist
+      const existingKeys = await listAPIKeys(c.env, 1);
+      if (existingKeys.length === 0) {
+        // No API keys exist, allow creation without auth
+        return next();
+      }
+    } catch (error) {
+      // If we can't check existing keys, allow creation (fail open for first key)
+      console.warn('Could not check existing API keys, allowing key creation:', error);
+      return next();
+    }
   }
 
   // Extract API key from Authorization header or query parameter
@@ -140,11 +162,12 @@ export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) 
  * Get required permission for an endpoint
  */
 function getRequiredPermission(path: string): string | null {
-  if (path.startsWith('/v1/chat/completions') || path.startsWith('/v1/messages')) {
+  if (path.startsWith('/v1/chat/completions') || path.startsWith('/chat/completions') ||
+      path.startsWith('/v1/messages') || path === '/messages') {
     return 'chat';
   }
-  
-  if (path.startsWith('/v1/keys')) {
+
+  if (path.startsWith('/v1/keys') || path.startsWith('/keys')) {
     return 'admin';
   }
 

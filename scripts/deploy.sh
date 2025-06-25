@@ -55,8 +55,13 @@ check_prerequisites() {
     
     # Check wrangler
     if ! command -v wrangler &> /dev/null; then
-        print_warning "Wrangler CLI not found. Installing..."
-        npm install -g wrangler@latest
+        print_warning "Wrangler CLI not found. Installing locally..."
+        npm install wrangler@latest
+        print_status "Using local wrangler via npx"
+        WRANGLER_CMD="npx wrangler"
+    else
+        WRANGLER_CMD="wrangler"
+        print_success "Wrangler CLI found: $(wrangler --version)"
     fi
     
     print_success "Prerequisites check passed"
