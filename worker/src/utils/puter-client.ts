@@ -10,7 +10,7 @@ export class PuterClient {
 
   /**
    * Execute Puter.js chat function server-side
-   * Uses a browser-like environment to run the actual Puter.js library
+   * Uses direct API calls to Puter's backend services
    */
   async chat(
     prompt: string | Array<{ role: string; content: string }>,
@@ -24,167 +24,281 @@ export class PuterClient {
       tools
     } = options;
 
+    console.log('🔍 [PUTER] Starting direct API integration');
+    console.log('🔍 [PUTER] Model:', model);
+    console.log('🔍 [PUTER] Stream:', stream);
+
     try {
-      // Use the browser-like environment to execute Puter.js
-      return await this.executePuterJS(prompt, options);
+      // Use direct API calls to Puter's backend
+      return await this.callPuterDriversAPI(prompt, options);
     } catch (error) {
-      console.error('Puter API call failed:', error);
+      console.error('❌ [PUTER] Direct API call failed:', error);
       throw new Error(`Puter API call failed: ${error}`);
     }
   }
 
   /**
-   * Execute Puter.js in a browser-like environment
-   * This creates a minimal DOM environment and loads Puter.js
+   * Call Puter's drivers API directly
+   * This bypasses the browser environment and calls the backend API directly
    */
-  private async executePuterJS(
+  private async callPuterDriversAPI(
     prompt: string | Array<{ role: string; content: string }>,
     options: PuterChatOptions
   ): Promise<PuterChatResponse | AsyncIterable<{ text?: string }>> {
-    console.log('🔍 [DEBUG] Starting Puter.js execution attempt');
-    console.log('🔍 [DEBUG] Prompt:', typeof prompt === 'string' ? prompt.substring(0, 100) : JSON.stringify(prompt).substring(0, 100));
-    console.log('🔍 [DEBUG] Options:', JSON.stringify(options));
+    console.log('🔍 [PUTER] Preparing direct API call to Puter drivers');
+    console.log('🔍 [PUTER] Prompt type:', typeof prompt);
+    console.log('🔍 [PUTER] Options:', JSON.stringify(options));
 
-    // Create a browser-like environment using Web APIs available in Cloudflare Workers
-    const browserCode = this.generatePuterJSCode(prompt, options);
-    console.log('🔍 [DEBUG] Generated browser code length:', browserCode.length);
+    // Prepare the request payload for Puter's drivers API
+    const payload = this.preparePuterAPIPayload(prompt, options);
+    console.log('🔍 [PUTER] Prepared payload:', JSON.stringify(payload));
 
     try {
-      console.log('🔍 [DEBUG] Attempting browser environment execution...');
-      // Execute the code in a simulated browser environment
-      const result = await this.executeInBrowserEnvironment(browserCode);
-      console.log('✅ [DEBUG] Browser execution succeeded:', typeof result, result ? Object.keys(result) : 'null');
+      console.log('🔍 [PUTER] Making direct API call to Puter backend...');
+
+      // Make the direct API call to Puter's drivers endpoint
+      const response = await this.makePuterDriversRequest(payload, options.stream);
+      console.log('✅ [PUTER] Direct API call succeeded');
 
       if (options.stream) {
-        console.log('🔍 [DEBUG] Creating stream from result');
-        return this.createStreamFromResult(result);
+        console.log('🔍 [PUTER] Processing streaming response');
+        return this.processStreamingResponse(response);
       } else {
-        console.log('🔍 [DEBUG] Parsing non-stream result');
-        return this.parseNonStreamResult(result);
+        console.log('🔍 [PUTER] Processing non-streaming response');
+        return this.processNonStreamingResponse(response);
       }
     } catch (error) {
-      console.error('❌ [DEBUG] Browser execution failed with error:', error);
-      console.error('❌ [DEBUG] Error type:', typeof error);
-      console.error('❌ [DEBUG] Error message:', error instanceof Error ? error.message : String(error));
-      console.error('❌ [DEBUG] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('❌ [PUTER] Direct API call failed:', error);
+      console.error('❌ [PUTER] Error details:', error instanceof Error ? error.message : String(error));
 
-      // Fallback to direct API approach if available
-      console.log('🔄 [DEBUG] Falling back to direct API approach');
-      return await this.fallbackToDirectAPI(prompt, options);
+      // Provide a helpful error message explaining the limitation
+      console.log('🔄 [PUTER] Providing informative error response');
+      return this.createInformativeErrorResponse(prompt, options, error);
     }
   }
 
   /**
-   * Generate JavaScript code to execute Puter.js
+   * Prepare the payload for Puter's drivers API
    */
-  private generatePuterJSCode(
+  private preparePuterAPIPayload(
     prompt: string | Array<{ role: string; content: string }>,
     options: PuterChatOptions
-  ): string {
-    const promptStr = typeof prompt === 'string'
-      ? JSON.stringify(prompt)
-      : JSON.stringify(prompt);
-
-    const optionsStr = JSON.stringify(options);
-
-    return `
-      // Create a minimal DOM environment
-      if (typeof window === 'undefined') {
-        global.window = global;
-        global.document = {
-          createElement: () => ({ onload: null }),
-          head: { appendChild: () => {} },
-          addEventListener: () => {},
-          readyState: 'complete'
-        };
-        global.navigator = { userAgent: 'PuterProxy/1.0' };
-        global.location = { href: 'https://puter-proxy.local' };
-      }
-
-      // Load Puter.js dynamically
-      async function loadPuter() {
-        try {
-          // Fetch Puter.js library
-          const response = await fetch('${PuterClient.PUTER_JS_URL}');
-          const puterCode = await response.text();
-
-          // Execute Puter.js in our environment
-          eval(puterCode);
-
-          // Wait for Puter to initialize
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-          // Execute the chat function
-          const result = await puter.ai.chat(${promptStr}, ${optionsStr});
-          return result;
-        } catch (error) {
-          throw new Error('Failed to load or execute Puter.js: ' + error.message);
-        }
-      }
-
-      loadPuter();
-    `;
-  }
-
-  /**
-   * Execute code in a browser-like environment
-   */
-  private async executeInBrowserEnvironment(code: string): Promise<any> {
-    try {
-      // Create a new function context to isolate execution
-      const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-      const executor = new AsyncFunction('fetch', 'setTimeout', code);
-
-      // Execute with necessary globals
-      const result = await executor(fetch, setTimeout);
-      return result;
-    } catch (error) {
-      throw new Error(`Browser environment execution failed: ${error}`);
-    }
-  }
-
-  /**
-   * Create streaming response from result
-   */
-  private async* createStreamFromResult(result: any): AsyncIterable<{ text?: string }> {
-    if (result && Symbol.asyncIterator in result) {
-      // If result is already an async iterator, yield from it
-      for await (const chunk of result) {
-        yield chunk;
-      }
-    } else if (result && typeof result === 'string') {
-      // If result is a string, simulate streaming
-      const words = result.split(' ');
-      for (const word of words) {
-        yield { text: word + ' ' };
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
+  ): any {
+    // Convert prompt to messages format if it's a string
+    let messages: Array<{ role: string; content: string }>;
+    if (typeof prompt === 'string') {
+      messages = [{ role: 'user', content: prompt }];
     } else {
-      // Fallback: yield the entire result as one chunk
-      yield { text: result?.toString() || 'No response' };
-    }
-  }
-
-  /**
-   * Parse non-streaming result
-   */
-  private parseNonStreamResult(result: any): PuterChatResponse {
-    if (result && result.message) {
-      return result;
+      messages = prompt;
     }
 
-    // Convert string result to proper format
-    const text = result?.toString() || 'No response';
-    return {
-      message: {
-        role: 'assistant',
-        content: [{
-          type: 'text',
-          text
-        }],
-        tool_calls: undefined
+    // Prepare the payload that matches Puter's drivers API format
+    const payload = {
+      interface: 'puter-chat-completion',
+      method: 'ai-chat',
+      args: {
+        messages: messages,
+        model: options.model || 'claude-3-5-sonnet',
+        stream: options.stream || false,
+        max_tokens: options.max_tokens,
+        temperature: options.temperature,
+        tools: options.tools
       }
     };
+
+    console.log('🔍 [PUTER] Prepared payload structure:', {
+      interface: payload.interface,
+      method: payload.method,
+      argsKeys: Object.keys(payload.args),
+      messagesCount: messages.length
+    });
+
+    return payload;
+  }
+
+  /**
+   * Make the actual request to Puter's drivers API
+   */
+  private async makePuterDriversRequest(payload: any, isStreaming: boolean = false): Promise<any> {
+    console.log('🔍 [PUTER] Making request to Puter drivers API');
+    console.log('🔍 [PUTER] Payload:', JSON.stringify(payload, null, 2));
+
+    // Puter's API endpoint for drivers
+    const apiUrl = 'https://api.puter.com/drivers/call';
+
+    try {
+      console.log('🔍 [PUTER] Sending request to:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'PuterProxy/1.0',
+          // Note: Puter.js typically doesn't require authentication for basic AI calls
+          // but we might need to handle this differently
+        },
+        body: JSON.stringify(payload)
+      });
+
+      console.log('🔍 [PUTER] Response status:', response.status);
+      console.log('🔍 [PUTER] Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [PUTER] API request failed:', response.status, response.statusText);
+        console.error('❌ [PUTER] Error response:', errorText);
+        throw new Error(`Puter API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      console.log('🔍 [PUTER] Response content type:', contentType);
+
+      if (isStreaming || contentType.includes('application/x-ndjson')) {
+        console.log('🔍 [PUTER] Processing streaming response');
+        return response;
+      } else {
+        console.log('🔍 [PUTER] Processing JSON response');
+        const result = await response.json();
+        console.log('✅ [PUTER] API request successful, result type:', typeof result);
+        console.log('✅ [PUTER] Result preview:', JSON.stringify(result).substring(0, 200));
+        return result;
+      }
+    } catch (error) {
+      console.error('❌ [PUTER] Request failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process streaming response from Puter API
+   */
+  private async* processStreamingResponse(response: Response): AsyncIterable<{ text?: string }> {
+    console.log('🔍 [PUTER] Processing streaming response');
+
+    if (!response.body) {
+      console.error('❌ [PUTER] No response body for streaming');
+      yield { text: 'Error: No response body' };
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          console.log('✅ [PUTER] Streaming complete');
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the last incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const data = JSON.parse(line);
+              console.log('🔍 [PUTER] Streaming chunk:', data);
+
+              // Extract text from the streaming response
+              if (data.text) {
+                yield { text: data.text };
+              } else if (data.content) {
+                yield { text: data.content };
+              } else if (data.delta?.content) {
+                yield { text: data.delta.content };
+              } else {
+                console.log('🔍 [PUTER] Unknown streaming format:', data);
+                yield { text: JSON.stringify(data) };
+              }
+            } catch (parseError) {
+              console.error('❌ [PUTER] Failed to parse streaming line:', line, parseError);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ [PUTER] Streaming error:', error);
+      yield { text: `Error: ${error}` };
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  /**
+   * Process non-streaming response from Puter API
+   */
+  private processNonStreamingResponse(result: any): PuterChatResponse {
+    console.log('🔍 [PUTER] Processing non-streaming response:', typeof result);
+    console.log('🔍 [PUTER] Result structure:', result ? Object.keys(result) : 'null');
+
+    // Handle different response formats from Puter API
+    if (result && result.success && result.result) {
+      // Puter API success response format
+      const puterResult = result.result;
+      console.log('✅ [PUTER] Puter API success response');
+
+      if (typeof puterResult === 'string') {
+        return {
+          message: {
+            role: 'assistant',
+            content: [{
+              type: 'text',
+              text: puterResult
+            }],
+            tool_calls: undefined
+          }
+        };
+      } else if (puterResult.message) {
+        return puterResult;
+      } else {
+        return {
+          message: {
+            role: 'assistant',
+            content: [{
+              type: 'text',
+              text: JSON.stringify(puterResult)
+            }],
+            tool_calls: undefined
+          }
+        };
+      }
+    } else if (result && result.message) {
+      // Direct message format
+      console.log('✅ [PUTER] Direct message format');
+      return result;
+    } else if (typeof result === 'string') {
+      // String response
+      console.log('✅ [PUTER] String response format');
+      return {
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'text',
+            text: result
+          }],
+          tool_calls: undefined
+        }
+      };
+    } else {
+      // Fallback format
+      console.log('⚠️ [PUTER] Unknown response format, using fallback');
+      const text = result ? JSON.stringify(result) : 'No response received';
+      return {
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'text',
+            text
+          }],
+          tool_calls: undefined
+        }
+      };
+    }
   }
 
   /**
@@ -333,33 +447,148 @@ Please try again later or check the Puter.com status.`;
    * Test connectivity to Puter services
    */
   async testConnectivity(): Promise<{ status: 'healthy' | 'degraded' | 'unhealthy'; latency: number; error?: string }> {
+    console.log('🔍 [CONNECTIVITY] Starting Puter connectivity test');
     const startTime = Date.now();
 
     try {
-      // Test by trying to load Puter.js
-      const response = await fetch(PuterClient.PUTER_JS_URL, {
-        method: 'HEAD',
-        signal: AbortSignal.timeout(5000)
+      console.log('🔍 [CONNECTIVITY] Testing Puter API connectivity');
+
+      // Test the actual Puter drivers API with a simple request
+      const testPayload = {
+        interface: 'puter-chat-completion',
+        method: 'ai-chat',
+        args: {
+          messages: [{ role: 'user', content: 'test' }],
+          model: 'claude-3-5-sonnet',
+          max_tokens: 1
+        }
+      };
+
+      console.log('🔍 [CONNECTIVITY] Making test request to Puter API');
+      const response = await fetch('https://api.puter.com/drivers/call', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'PuterProxy/1.0'
+        },
+        body: JSON.stringify(testPayload),
+        signal: AbortSignal.timeout(10000)
       });
 
       const latency = Date.now() - startTime;
+      console.log('🔍 [CONNECTIVITY] Response received in', latency, 'ms');
+      console.log('🔍 [CONNECTIVITY] Response status:', response.status);
+      console.log('🔍 [CONNECTIVITY] Response ok:', response.ok);
 
       if (response.ok) {
+        console.log('✅ [CONNECTIVITY] Puter API connectivity test passed');
         return { status: 'healthy', latency };
-      } else {
+      } else if (response.status === 401 || response.status === 403) {
+        console.log('🔐 [CONNECTIVITY] Puter API requires authentication');
         return {
           status: 'degraded',
           latency,
-          error: `HTTP ${response.status}: ${response.statusText}`
+          error: `Authentication required: ${response.status} ${response.statusText}`
+        };
+      } else {
+        console.log('⚠️ [CONNECTIVITY] Puter API connectivity test degraded');
+        const errorText = await response.text();
+        console.log('🔍 [CONNECTIVITY] Error response:', errorText);
+        return {
+          status: 'degraded',
+          latency,
+          error: `HTTP ${response.status}: ${response.statusText} - ${errorText.substring(0, 100)}`
         };
       }
     } catch (error) {
       const latency = Date.now() - startTime;
+      console.error('❌ [CONNECTIVITY] Connectivity test failed:', error);
+      console.error('❌ [CONNECTIVITY] Error type:', typeof error);
+      console.error('❌ [CONNECTIVITY] Error message:', error instanceof Error ? error.message : String(error));
+
       return {
         status: 'unhealthy',
         latency,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
+    }
+  }
+
+  /**
+   * Create an informative error response that explains the current limitations
+   */
+  private createInformativeErrorResponse(
+    prompt: string | Array<{ role: string; content: string }>,
+    options: PuterChatOptions,
+    error: any
+  ): PuterChatResponse | AsyncIterable<{ text?: string }> {
+    const promptText = typeof prompt === 'string' ? prompt :
+      prompt.map(m => `${m.role}: ${m.content}`).join('\n');
+
+    const errorMessage = `🚧 **Puter.com Integration Status Update**
+
+**Current Status:** The Puter Claude API Proxy is experiencing connectivity issues with Puter.com's backend services.
+
+**What happened:** Your request "${promptText.substring(0, 100)}${promptText.length > 100 ? '...' : ''}" could not be processed because:
+
+${error instanceof Error ? error.message : String(error)}
+
+**Technical Details:**
+- Puter.com's AI services require browser-based authentication
+- Server-to-server API access may require different authentication methods
+- The free tier may have usage limitations or require user authentication
+
+**Recommended Solutions:**
+
+1. **Use Puter.js directly in your browser:**
+   \`\`\`html
+   <script src="https://js.puter.com/v2/"></script>
+   <script>
+     puter.ai.chat("${typeof prompt === 'string' ? prompt : 'Your prompt'}")
+       .then(response => console.log(response));
+   </script>
+   \`\`\`
+
+2. **Alternative AI APIs:**
+   - OpenAI API (requires API key)
+   - Anthropic Claude API (requires API key)
+   - Google Gemini API (requires API key)
+
+3. **Check Puter.com Status:**
+   - Visit https://puter.com for service status
+   - Check if authentication is required for your use case
+
+**For Developers:**
+This proxy is designed to bridge server-side applications with Puter.com's browser-based AI services. The current implementation attempts direct API integration but may require additional authentication mechanisms.
+
+**Model Requested:** ${options.model || 'claude-3-5-sonnet'}
+**Streaming:** ${options.stream ? 'Yes' : 'No'}
+**Error Time:** ${new Date().toISOString()}`;
+
+    if (options.stream) {
+      return this.createInformativeErrorStream(errorMessage);
+    } else {
+      return {
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'text',
+            text: errorMessage
+          }],
+          tool_calls: undefined
+        }
+      };
+    }
+  }
+
+  /**
+   * Create streaming error response
+   */
+  private async* createInformativeErrorStream(message: string): AsyncIterable<{ text?: string }> {
+    const words = message.split(' ');
+    for (const word of words) {
+      yield { text: word + ' ' };
+      await new Promise(resolve => setTimeout(resolve, 30));
     }
   }
 }

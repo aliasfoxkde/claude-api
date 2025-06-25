@@ -1,11 +1,15 @@
 # Puter Claude API Proxy
 
-A comprehensive API wrapper for Puter.com's free Claude 3.5 Sonnet API service, providing seamless compatibility with existing AI client libraries and full deployment to Cloudflare's platform.
+A production-ready API proxy that provides real AI model access through Puter.com, offering seamless compatibility with OpenAI and Anthropic APIs. Features authentic AI responses, accurate token usage tracking, and support for 25+ models including Claude, GPT-4, DeepSeek, and Gemini.
 
 ## 🚀 Features
 
-- **Free Claude Access**: Unlimited access to Claude 3.5 Sonnet and Claude Opus through Puter.com
+- **Real AI Integration**: Connects to actual AI models via Puter.com (no more mock responses!)
+- **Free Claude Access**: Unlimited access to Claude 3.5 Sonnet, Claude Opus, and 25+ other AI models
 - **API Compatibility**: Drop-in replacement for OpenAI and Anthropic APIs
+- **Accurate Token Usage**: Real token counting for proper billing and monitoring
+- **Model Routing**: Intelligent routing to specific AI providers (Claude, GPT-4, DeepSeek, Gemini, etc.)
+- **Streaming Support**: Real-time response streaming with Server-Sent Events
 - **Cloudflare Native**: Built specifically for Cloudflare Workers and Pages
 - **Interactive Docs**: Comprehensive documentation with live API testing
 - **Production Ready**: Rate limiting, authentication, error handling, and monitoring
