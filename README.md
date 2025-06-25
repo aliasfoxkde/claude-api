@@ -101,32 +101,77 @@ cd docs
 npm run dev
 ```
 
-## 🚀 Deployment
+## 🚀 Quick Deployment
 
-### Automated (Recommended)
+### Option 1: Automated Script (Recommended)
+```bash
+# Run the complete deployment script
+./scripts/deploy.sh
+
+# Or deploy only the worker
+./scripts/deploy.sh --worker-only
+
+# Or deploy only the documentation
+./scripts/deploy.sh --docs-only
+```
+
+### Option 2: Step by Step
+
+1. **Create KV Namespaces:**
+   ```bash
+   ./scripts/create-kv-namespaces.sh
+   ```
+
+2. **Deploy Worker:**
+   ```bash
+   npm run deploy
+   ```
+
+3. **Deploy Documentation:**
+   ```bash
+   cd docs && npm run deploy
+   ```
+
+### Option 3: GitHub Actions (Automated)
 Push to main branch - GitHub Actions will deploy automatically.
 
-### Manual
-```bash
-# Deploy worker
-cd worker
-npm run deploy
+### Option 4: Cloudflare Dashboard
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. Navigate to "Workers & Pages"
+3. Click "Create application" → "Pages" → "Connect to Git"
+4. Select your repository and configure build settings
 
-# Deploy docs
-cd docs
-npm run build
-wrangler pages publish dist
+## 🧪 Testing Your Deployment
+
+After deployment, test your API:
+
+```bash
+# Test all endpoints
+./scripts/test-api.sh --base-url https://your-worker.workers.dev/v1
+
+# Test with API keys
+./scripts/test-api.sh --api-key pk-your-key --admin-key pk-admin-key
 ```
 
 ## 🔑 API Key Management
 
-Generate API keys through the documentation interface or API:
-
+### First API Key (No Auth Required)
 ```bash
 curl -X POST https://your-worker.your-subdomain.workers.dev/v1/keys \
   -H "Content-Type: application/json" \
+  -d '{"name": "Admin Key", "permissions": ["chat", "admin"]}'
+```
+
+### Subsequent Keys (Requires Admin Key)
+```bash
+curl -X POST https://your-worker.your-subdomain.workers.dev/v1/keys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-admin-key" \
   -d '{"name": "my-app", "permissions": ["chat"]}'
 ```
+
+### Via Documentation Interface
+Visit your deployed documentation site and use the API Keys page for a user-friendly interface.
 
 ## 📊 Usage Examples
 
@@ -161,6 +206,49 @@ const response = await anthropic.messages.create({
 });
 ```
 
+## 🔧 Troubleshooting
+
+### Build Fails with "Missing entry-point"
+- Ensure `wrangler.toml` exists in the root directory
+- Check that `main = "worker/src/index.ts"` points to the correct file
+- Run `./scripts/create-kv-namespaces.sh` to set up KV namespaces
+
+### KV Namespace Errors
+- Verify namespace IDs in `wrangler.toml` are correct
+- Ensure you have both production and preview namespace IDs
+- Check Cloudflare dashboard for namespace status
+
+### API Key Issues
+- First API key creation doesn't require authentication
+- Subsequent operations require admin permissions
+- Check rate limits and API key permissions
+
+### CORS Errors
+- Update `CORS_ORIGINS` in `wrangler.toml`
+- Include your documentation site and client domains
+- Redeploy after making changes
+
+### Rate Limiting
+- Check KV namespace configuration
+- Verify rate limiting headers in responses
+- Adjust limits in environment variables
+
+### Common Commands
+```bash
+# Check deployment status
+wrangler whoami
+wrangler kv:namespace list
+
+# View logs
+wrangler tail
+
+# Test locally
+npm run dev
+
+# Redeploy
+./scripts/deploy.sh
+```
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -175,10 +263,21 @@ MIT License - see LICENSE file for details.
 
 ## 🆘 Support
 
-- Documentation: [Your Cloudflare Pages URL]
-- Issues: GitHub Issues
-- Discord: [Your Discord Server]
+- **Documentation**: [Your Cloudflare Pages URL]
+- **Issues**: GitHub Issues
+- **Setup Guide**: `scripts/cloudflare-setup.md`
+- **Testing**: `scripts/test-api.sh --help`
+
+## 🎯 What's Next?
+
+After successful deployment:
+
+1. **Generate API Keys**: Create keys for your applications
+2. **Update Client Code**: Change base URLs in your existing apps
+3. **Monitor Usage**: Check Cloudflare Analytics and logs
+4. **Custom Domains**: Set up custom domains for production
+5. **Scale**: Adjust rate limits based on your needs
 
 ---
 
-Built with ❤️ for the AI developer community
+Built with ❤️ for the AI developer community. Powered by [Puter.com](https://puter.com) and [Cloudflare](https://cloudflare.com).
