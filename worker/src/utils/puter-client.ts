@@ -41,21 +41,35 @@ export class PuterClient {
     prompt: string | Array<{ role: string; content: string }>,
     options: PuterChatOptions
   ): Promise<PuterChatResponse | AsyncIterable<{ text?: string }>> {
+    console.log('🔍 [DEBUG] Starting Puter.js execution attempt');
+    console.log('🔍 [DEBUG] Prompt:', typeof prompt === 'string' ? prompt.substring(0, 100) : JSON.stringify(prompt).substring(0, 100));
+    console.log('🔍 [DEBUG] Options:', JSON.stringify(options));
+
     // Create a browser-like environment using Web APIs available in Cloudflare Workers
     const browserCode = this.generatePuterJSCode(prompt, options);
+    console.log('🔍 [DEBUG] Generated browser code length:', browserCode.length);
 
     try {
+      console.log('🔍 [DEBUG] Attempting browser environment execution...');
       // Execute the code in a simulated browser environment
       const result = await this.executeInBrowserEnvironment(browserCode);
+      console.log('✅ [DEBUG] Browser execution succeeded:', typeof result, result ? Object.keys(result) : 'null');
 
       if (options.stream) {
+        console.log('🔍 [DEBUG] Creating stream from result');
         return this.createStreamFromResult(result);
       } else {
+        console.log('🔍 [DEBUG] Parsing non-stream result');
         return this.parseNonStreamResult(result);
       }
     } catch (error) {
-      console.error('Browser execution failed:', error);
+      console.error('❌ [DEBUG] Browser execution failed with error:', error);
+      console.error('❌ [DEBUG] Error type:', typeof error);
+      console.error('❌ [DEBUG] Error message:', error instanceof Error ? error.message : String(error));
+      console.error('❌ [DEBUG] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
       // Fallback to direct API approach if available
+      console.log('🔄 [DEBUG] Falling back to direct API approach');
       return await this.fallbackToDirectAPI(prompt, options);
     }
   }
