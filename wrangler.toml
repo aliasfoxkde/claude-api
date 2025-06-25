@@ -13,13 +13,13 @@ name = "claude-api-staging"
 # You need to create these namespaces and update the IDs
 [[kv_namespaces]]
 binding = "API_KEYS"
-id = "your-api-keys-namespace-id"
-preview_id = "your-api-keys-preview-namespace-id"
+id = "fae8bbd7f4af481389472460a6c785ca"
+preview_id = "fae8bbd7f4af481389472460a6c785ca"
 
 [[kv_namespaces]]
 binding = "RATE_LIMITS"
-id = "your-rate-limits-namespace-id"
-preview_id = "your-rate-limits-preview-namespace-id"
+id = "ce95cdc3e48e4f9a9bcfc6e46cb9bb9b"
+preview_id = "ce95cdc3e48e4f9a9bcfc6e46cb9bb9b"
 
 # Environment variables
 [vars]
