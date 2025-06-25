@@ -1,13 +1,13 @@
-name = "puter-claude-api"
+name = "claude-api"
 main = "worker/src/index.ts"
 compatibility_date = "2024-01-15"
 compatibility_flags = ["nodejs_compat"]
 
 [env.production]
-name = "puter-claude-api"
+name = "claude-api"
 
 [env.staging]
-name = "puter-claude-api-staging"
+name = "claude-api-staging"
 
 # KV Namespaces for API key storage and rate limiting
 # You need to create these namespaces and update the IDs
