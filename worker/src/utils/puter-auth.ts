@@ -32,6 +32,62 @@ export class PuterAuthManager {
   }
 
   /**
+   * Get user app token for API calls
+   */
+  async getUserAppToken(): Promise<string | null> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return null;
+    }
+
+    // If we already have a user app token, return it
+    if (credentials.userAppToken) {
+      return credentials.userAppToken;
+    }
+
+    try {
+      console.log('🔍 [PUTER_AUTH] Getting user app token');
+
+      // Get user app token using the auth token
+      const response = await fetch('https://api.puter.com/auth/get-user-app-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cookie': `puter_auth_token=${credentials.authToken}`,
+          'Referer': 'https://puter.com/',
+          'Origin': 'https://puter.com'
+        },
+        body: JSON.stringify({
+          app_uid: credentials.appId
+        })
+      });
+
+      if (response.ok) {
+        const tokenData = await response.json();
+        const userAppToken = tokenData.token;
+
+        if (userAppToken) {
+          // Store the user app token
+          credentials.userAppToken = userAppToken;
+          await this.env.PUTER_AUTH.put(
+            PuterAuthManager.AUTH_KEY,
+            JSON.stringify(credentials)
+          );
+
+          console.log('✅ [PUTER_AUTH] User app token obtained and stored');
+          return userAppToken;
+        }
+      }
+
+      console.log('❌ [PUTER_AUTH] Failed to get user app token:', response.status);
+      return null;
+    } catch (error) {
+      console.error('❌ [PUTER_AUTH] Error getting user app token:', error);
+      return null;
+    }
+  }
+
+  /**
    * Retrieve stored Puter authentication credentials
    */
   async getCredentials(): Promise<PuterAuthCredentials | null> {
@@ -75,15 +131,22 @@ export class PuterAuthManager {
 
     try {
       console.log('🔍 [PUTER_AUTH] Validating credentials with test API call');
-      
+
+      // Use cookie-based authentication (working approach)
+
       // Make a test API call to validate the credentials
       const testPayload = {
-        messages: [{ role: 'user', content: 'test' }],
-        model: 'claude-3-5-sonnet',
-        max_tokens: 1
+        interface: 'puter-chat-completion',
+        method: 'complete',
+        test_mode: false,
+        args: {
+          messages: [{ role: 'user', content: 'test' }],
+          model: 'claude-3-5-sonnet',
+          max_tokens: 1
+        }
       };
 
-      const response = await fetch('https://api.puter.com/ai/chat', {
+      const response = await fetch('https://api.puter.com/drivers/call', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -228,6 +228,7 @@ export interface APIError {
 export interface PuterAuthCredentials {
   appId: string;
   authToken: string;
+  userAppToken?: string;
   createdAt: string;
   lastUsed?: string;
   isValid: boolean;
