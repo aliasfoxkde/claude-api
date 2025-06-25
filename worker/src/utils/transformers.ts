@@ -120,7 +120,6 @@ export function transformPuterToOpenAI(
   response.usage.total_tokens = response.usage.prompt_tokens + response.usage.completion_tokens;
 
   return response;
-  };
 }
 
 /**
