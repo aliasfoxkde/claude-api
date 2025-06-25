@@ -1,0 +1,150 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  pull_request:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # Test and lint
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint worker
+        run: cd worker && npm run lint
+
+      - name: Type check worker
+        run: cd worker && npm run type-check
+
+      - name: Test worker
+        run: cd worker && npm test
+
+      - name: Lint docs
+        run: cd docs && npm run lint
+
+      - name: Type check docs
+        run: cd docs && npm run type-check
+
+  # Deploy worker to Cloudflare Workers
+  deploy-worker:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd worker && npm ci
+
+      - name: Deploy to staging
+        if: github.ref == 'refs/heads/staging'
+        run: cd worker && npx wrangler deploy --env staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Deploy to production
+        if: github.ref == 'refs/heads/main'
+        run: cd worker && npx wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  # Deploy docs to Cloudflare Pages
+  deploy-docs:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd docs && npm ci
+
+      - name: Build docs
+        run: cd docs && npm run build
+        env:
+          VITE_API_BASE_URL: ${{ github.ref == 'refs/heads/main' && 'https://your-worker.your-subdomain.workers.dev' || 'https://your-worker-staging.your-subdomain.workers.dev' }}
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: puter-claude-docs
+          directory: docs/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  # Create GitHub release on main branch
+  release:
+    needs: [deploy-worker, deploy-docs]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: echo "version=v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ## Changes
+            
+            - Deployed worker to production
+            - Deployed documentation to Cloudflare Pages
+            
+            ## Deployment URLs
+            
+            - **API**: https://your-worker.your-subdomain.workers.dev
+            - **Documentation**: https://your-docs-site.pages.dev
+            
+            ## Commit
+            
+            ${{ github.sha }}
+          draft: false
+          prerelease: false

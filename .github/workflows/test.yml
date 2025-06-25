@@ -1,0 +1,126 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, staging, develop ]
+  pull_request:
+    branches: [ main, staging ]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  test-worker:
+    runs-on: ubuntu-latest
+    name: Test Worker
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install worker dependencies
+        run: cd worker && npm ci
+
+      - name: Lint worker
+        run: cd worker && npm run lint
+
+      - name: Type check worker
+        run: cd worker && npm run type-check
+
+      - name: Test worker
+        run: cd worker && npm test
+
+      - name: Build worker (dry run)
+        run: cd worker && npm run build
+
+  test-docs:
+    runs-on: ubuntu-latest
+    name: Test Documentation
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install docs dependencies
+        run: cd docs && npm ci
+
+      - name: Lint docs
+        run: cd docs && npm run lint
+
+      - name: Type check docs
+        run: cd docs && npm run type-check
+
+      - name: Build docs
+        run: cd docs && npm run build
+        env:
+          VITE_API_BASE_URL: https://your-worker-staging.your-subdomain.workers.dev
+
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit
+        run: npm audit --audit-level=high
+
+      - name: Run worker security audit
+        run: cd worker && npm audit --audit-level=high
+
+      - name: Run docs security audit
+        run: cd docs && npm audit --audit-level=high
+
+  dependency-check:
+    runs-on: ubuntu-latest
+    name: Dependency Check
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for outdated dependencies
+        run: npm outdated || true
+
+      - name: Check worker dependencies
+        run: cd worker && npm outdated || true
+
+      - name: Check docs dependencies
+        run: cd docs && npm outdated || true

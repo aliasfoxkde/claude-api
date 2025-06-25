@@ -1,0 +1,27 @@
+{
+  "name": "puter-claude-openai-examples",
+  "version": "1.0.0",
+  "description": "OpenAI SDK examples for Puter Claude API Proxy",
+  "type": "module",
+  "scripts": {
+    "start": "node basic-chat.js",
+    "basic": "node basic-chat.js",
+    "streaming": "node streaming.js",
+    "functions": "node function-calling.js",
+    "vision": "node vision.js",
+    "all": "npm run basic && npm run streaming && npm run functions && npm run vision"
+  },
+  "dependencies": {
+    "openai": "^4.28.0",
+    "dotenv": "^16.3.1"
+  },
+  "keywords": [
+    "openai",
+    "claude",
+    "puter",
+    "api",
+    "examples"
+  ],
+  "author": "Puter Claude API Proxy",
+  "license": "MIT"
+}
